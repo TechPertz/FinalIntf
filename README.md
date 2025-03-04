@@ -1,6 +1,8 @@
-# Full-Stack Interface Project
+# Full-Stack Document approval and LLM compliance Project
 
 A modern full-stack application built with Next.js, FastAPI, and Neo4j.
+
+Video Link: https://drive.google.com/file/d/1nPlOuN-fHcD3wZN6EyJSEla9NQOL1Ptq/view?usp=sharing
 
 ## 🏗️ Architecture
 
@@ -40,6 +42,7 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 Backend API will be available at http://localhost:8000
+Backend API endpoints will be available at http://localhost:8000/docs
 
 ### 3. Setup Frontend (Next.js)
 ```bash
