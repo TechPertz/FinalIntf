@@ -4,13 +4,13 @@ import os
 from ..services.retrieval import get_relevant_context
 from semantic_router.encoders import HuggingFaceEncoder
 from semantic_chunkers import StatisticalChunker
-from openai import AsyncOpenAI
 import docx2txt
 import io
 import asyncio
 from typing import List, Dict
 import json
 from dotenv import load_dotenv
+from anthropic import AsyncAnthropic
 
 load_dotenv()
 
@@ -31,8 +31,8 @@ chunker = StatisticalChunker(
     max_split_tokens=SOP_MAX_tokens,
 )
 
-# Initialize OpenAI client
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Initialize Anthropic client
+client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 class QueryRequest(BaseModel):
     query: str
@@ -56,65 +56,76 @@ async def get_hybrid_context(query: str, chunk: Dict, faiss_path: str, db_path: 
     # Return the results directly
     return context["results"]
 
-async def process_chunk_with_openai(
+async def process_chunk_with_claude(
     chunk: Dict,
     query: str,
     context_results: Dict,
-    client: AsyncOpenAI
+    client: AsyncAnthropic
 ) -> Dict:
     """
-    Process a single chunk with OpenAI, incorporating hybrid retrieval results.
+    Process a single chunk with Claude, incorporating hybrid retrieval results.
     Returns structured analysis identifying errors with citations.
     """
-    # Construct the prompt with chunk, query, and hybrid context results
-    prompt = f"""
-    Analyze this SOP document chunk for compliance issues by comparing it with the regulatory context.
-    For each issue found, provide the following EXACT format:
-
-    ISSUE IN SOP DOCUMENT:
-    [Quote the exact text from the SOP document that contains the issue]
-
-    WHY ERROR:
-    [Explain specifically why this is a compliance issue or violation]
-
-    CITATION FROM CONTEXT:
-    [Quote the specific regulatory text that identifies this as an issue, including document name and page number]
-
-    If no issues are found, respond with exactly: "No compliance issues found in this section."
-
-    SOP DOCUMENT CHUNK:
-    {chunk['text']}
-    Source: {chunk.get('doc_name', 'Unknown')}
-
-    REGULATORY CONTEXT:
-    {json.dumps([{
-        'text': r['text'],
-        'source': r.get('doc_name', 'Unknown'),
-        'page': r.get('page_range', 'N/A')
-    } for r in context_results.get('results', [])], indent=2)}
-    """
-    
     try:
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a compliance expert analyzing SOP documents against regulatory requirements. Identify issues using the exact format specified."},
-                {"role": "user", "content": prompt}
-            ],
+        # Build the prompt string
+        prompt = f"""You are a compliance expert analyzing SOP documents against regulatory requirements. Your task is to identify compliance issues by comparing an SOP document chunk with regulatory context.
+
+IMPORTANT INSTRUCTIONS:
+1. You MUST follow the exact format specified below
+2. For each issue found, you MUST provide a direct quote from both the SOP and the regulatory context
+3. Citations MUST include the exact document name and page number from the regulatory context
+4. If you cannot find a specific citation to support an issue, do not report that issue
+
+For each compliance issue found, use this EXACT format:
+
+ISSUE IN SOP DOCUMENT:
+[Insert exact quote from the SOP document that contains the issue - do not paraphrase]
+
+WHY ERROR:
+[Explain specifically how this violates compliance requirements]
+
+CITATION FROM CONTEXT:
+[Insert exact quote from the regulatory context that shows this violation]
+Source: [Document Name], Page: [Page Number]
+
+If no issues are found with clear citations to support them, respond with exactly: "No compliance issues found in this section."
+
+Now analyze this SOP document:
+
+SOP DOCUMENT CHUNK:
+{chunk['text']}
+Source: {chunk.get('doc_name', 'Unknown')}
+
+Compare against this regulatory context:
+{json.dumps([{
+    'text': r['text'],
+    'source': r.get('doc_name', 'Unknown'),
+    'page': r.get('page_range', 'N/A')
+} for r in context_results.get('results', [])], indent=2)}
+
+Remember: Only report issues that you can support with specific citations from the provided regulatory context."""
+
+        # Make the API call
+        response = await client.messages.create(
+            model="claude-3-5-haiku-20241022",
+            max_tokens=1000,
             temperature=0.1,
-            max_tokens=1000
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }]
         )
         
         return {
             "chunk": chunk,
-            "analysis": response.choices[0].message.content,
+            "analysis": response.content[0].text,
             "context": context_results,
             "score": chunk.get('score', 0)
         }
     except Exception as e:
         return {
             "chunk": chunk,
-            "analysis": f"Error in OpenAI processing: {str(e)}",
+            "analysis": f"Error in Claude processing: {str(e)}",
             "context": context_results,
             "score": chunk.get('score', 0)
         }
@@ -178,8 +189,8 @@ async def search_regulations(
                     top_k=top_k
                 )
                 
-                # Process with OpenAI
-                analysis = await process_chunk_with_openai(
+                # Process with Claude
+                analysis = await process_chunk_with_claude(
                     chunk=chunk,
                     query=query,
                     context_results={"results": chunk_context},
@@ -188,8 +199,6 @@ async def search_regulations(
                 
                 # Extract and format the individual result
                 individual_results.append({
-                    # "document": chunk['doc_name'],
-                    # "page_range": chunk['page_range'],
                     "chunk_text": chunk['text'],
                     "analysis_result": analysis['analysis']
                 })

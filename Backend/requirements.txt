@@ -24,4 +24,4 @@ passlib
 bcrypt
 python-dotenv
 PyMuPDF
-openai
+anthropic  # For Claude API
