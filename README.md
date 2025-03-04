@@ -62,6 +62,21 @@ Frontend will be available at http://localhost:3000
 - Docker (for Neo4j)
 - OpenAI API key
 
+## 🧪 Testing
+
+### Test Users
+For testing purposes, the following user accounts are pre-configured:
+
+Gmail Organization:
+- user1@gmail.com
+- user2@gmail.com
+
+Interface Organization:
+- user1@interface.com
+- user2@interface.com
+
+No Password required. 
+
 ## 📁 Project Structure
 
 ```
@@ -90,4 +105,4 @@ NEO4J_PASSWORD=mypassword123
 
 ## 📝 License
 
-[MIT License](LICENSE) 
+[MIT License](LICENSE)
