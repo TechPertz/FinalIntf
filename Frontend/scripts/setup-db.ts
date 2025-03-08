@@ -124,8 +124,8 @@ function setupDatabase() {
       const users = [
         { email: 'user1@gmail.com', username: 'user1', organization: 'gmail' },
         { email: 'user2@gmail.com', username: 'user2', organization: 'gmail' },
-        { email: 'charlie@interface.com', username: 'charlie', organization: 'interface' },
-        { email: 'diana@interface.com', username: 'diana', organization: 'interface' }
+        { email: 'user1@interface.com', username: 'user1I', organization: 'interface' },
+        { email: 'user2@interface.com', username: 'user2I', organization: 'interface' }
       ]
 
       // Insert users and collect their IDs
